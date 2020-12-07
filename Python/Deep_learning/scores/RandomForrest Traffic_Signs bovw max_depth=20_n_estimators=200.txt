@@ -1,0 +1,2 @@
+model,features,parameters,accuracy
+RandomForrest,bovw,"max_depth=20_n_estimators=200",0.8772277227722772

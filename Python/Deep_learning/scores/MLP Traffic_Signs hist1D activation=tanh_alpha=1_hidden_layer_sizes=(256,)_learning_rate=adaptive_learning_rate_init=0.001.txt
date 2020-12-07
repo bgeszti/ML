@@ -1,0 +1,2 @@
+model,features,parameters,accuracy
+MLP,hist1D,"activation=tanh_alpha=1_hidden_layer_sizes=(256,)_learning_rate=adaptive_learning_rate_init=0.001",0.9194719471947195

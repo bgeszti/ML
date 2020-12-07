@@ -1,0 +1,2 @@
+model,features,parameters,accuracy
+MLP,hist2D,"activation=relu_alpha=0.01_hidden_layer_sizes=(256,)",0.38271604938271603

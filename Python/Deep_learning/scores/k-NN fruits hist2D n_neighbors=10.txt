@@ -1,0 +1,2 @@
+model,features,parameters,accuracy
+k-NN,hist2D,"n_neighbors=10",0.1728395061728395

@@ -1,0 +1,2 @@
+model,features,parameters,accuracy
+MLP,bovw,"activation=tanh_alpha=0.1_hidden_layer_sizes=(256,)",0.32510288065843623

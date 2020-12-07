@@ -1,0 +1,2 @@
+model,features,parameters,accuracy
+RandomForrest,hist1D,"max_depth=20_n_estimators=200",0.8937293729372937

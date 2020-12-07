@@ -1,0 +1,2 @@
+model,features,parameters,accuracy
+MLP,hist1D,"activation=tanh_alpha=1_hidden_layer_sizes=(128, 64)",0.06995884773662552

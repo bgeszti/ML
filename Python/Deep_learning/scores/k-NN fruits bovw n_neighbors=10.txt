@@ -1,0 +1,2 @@
+model,features,parameters,accuracy
+k-NN,bovw,"n_neighbors=10",0.18106995884773663
