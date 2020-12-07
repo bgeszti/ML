@@ -1,0 +1,194 @@
+---
+title: "Simple template for R Markdown"
+author: "Eszter Katalin Bognar"
+date: "13.10.2020"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+subtitle: for Advanced Methods for Regression and Classification
+---
+
+# Load and preprocess data
+
+Load data:
+```{r, echo=TRUE}
+data(Hitters,package="ISLR")
+str(Hitters)
+```
+
+Remove all observations which contain missings, take the logarithm of salary as futher preprocessing step
+```{r, echo=TRUE,fig.width=4,fig.height=3}
+d <- na.omit(Hitters)
+#plot the Salary variable
+hist(d$Salary)
+#Salary is right-skewed so take the log of Salary
+d$Salary = log(d$Salary)
+hist(d$Salary, main="Histogram of log(d$Salary)")
+```
+
+Create train and test set (2/3 and 1/3):
+```{r, echo=TRUE}
+set.seed(123)
+smp_size <- floor(0.67* nrow(d))
+train_ind <- sample(seq_len(nrow(d)), size = smp_size)
+train <- d[train_ind, ]
+test <- d[-train_ind, ]
+```
+
+Explore dataset dimensions
+```{r, echo=TRUE}
+dim(train)
+dim(test)
+```
+
+# Investigate the full model on the training set
+
+## Matrix solution with manually created X design matrix
+```{r, echo=TRUE, error=TRUE}
+#create response vector
+y <- train$Salary
+#create the design matrix
+X <- as.matrix(train[-ncol(train)])
+# vector of ones with same length as rows in d
+int <- rep(1, length(y))
+# Add intercept column to X
+X <- cbind(int, X)
+#find betas (ERROR because of bad attribute types)
+betas <- solve(t(X) %*% X) %*% t(X) %*% y
+```
+
+We have problem witht he factor attributes. Matrix operation cannot be done using them, they must be numeric/complex matrix/vector arguments
+
+## Matrix solution with X created by model.matrix()
+```{r, echo=TRUE}
+#create response vector
+y <- train$Salary
+#create the design matrix
+X=model.matrix(Salary~ ., train)
+#view first 5 rows of matrix
+X[1:5, ]
+#find betas
+betas <- solve(t(X) %*% X) %*% t(X) %*% y
+# Round for easier viewing
+betas <- round(betas, 3)
+```
+
+Applying the design.matrix function solved the problem by automatically encoding the factor variables to numerics (0,1)
+
+## Compare the results for betas with the lm function
+```{r, echo=TRUE}
+res <- lm(Salary ~ ., data=train)
+# Round for easier viewing
+lm.betas <- round(res$coefficients, 3)
+# Create data.frame of results
+results <- data.frame(matrix.coeffs=betas, lm.coeffs=lm.betas)
+print(results)
+```
+We obtained the same betas using the matrix approach and using R's lm function.
+
+Examining variable contribution in the full lm model in explaining the salary variable
+```{r, echo=TRUE}
+model_summ=summary(res)
+model_summ
+mean(model_summ$residuals^2)
+```
+We can see that the intercept is very important. Walks and Errors variables are having the highest significance scores so they are the most important in explaining the salary. The Assists variable also contributes to the final model but with a bit less significance. The other variables are not significantly relevant in the model.
+
+Visual exploration of the results for train set
+```{r, echo=TRUE,fig.width=5,fig.height=3}
+plot(train$Salary,predict(res))
+title(main = "Training set predictions for the full model")
+abline(c(0,1))
+```
+
+Predicted and actual values on the train set
+```{r, echo=TRUE,fig.width=5,fig.height=3}
+#create data frame with a column of actual values and a column of predicted values
+data <- data.frame(pred = predict(res, train), actual = train$Salary)
+head(data)
+```
+
+Visual exploration of the results for train set
+```{r, echo=TRUE,fig.width=5,fig.height=3}
+#create data frame with a column of actual values and a column of predicted values
+plot(test$Salary,predict(res, test))
+title(main = "Test set predictions for the full model")
+abline(c(0,1))
+```
+
+Predicted and actual values on the test set
+```{r, echo=TRUE}
+#create data frame with a column of actual values and a column of predicted values
+data <- data.frame(pred = predict(res, test), actual = test$Salary)
+head(data)
+```
+
+# Evaluation of the lm model using MSE
+
+Define function for MSE calculation for the lm model
+```{r, echo=TRUE}
+MSE<- function(model,data){
+y=data$Salary
+yhat=predict(model, data)
+sum((yhat-y)^2)/nrow(data)
+#simpler solution
+#mean((data$Salary - predict.lm(res, data)) ^ 2)
+}
+```
+
+Calculate MSE 
+```{r, echo=TRUE}
+#mse train and test using lm
+mse_lm_train=MSE(res,train)
+mse_lm_test=MSE(res,test)
+
+#save results in a df
+df_lm <- data.frame(model='full_lm',mse_train = mse_lm_train, mse_test = mse_lm_test)
+df_lm
+```
+I got smaller MSE on the training set. This indicates a better fit on the training data that was used for training the model than on the unseen test data set. 
+
+# Reduced models
+
+Create reduced model by excluding not significant variables from the model
+```{r, echo=TRUE}
+res_reduced <- lm(Salary ~ Walks+Errors+Assists, data=train)
+summary(res_reduced)
+```
+Not all variables are significant in the reduced model, only the intercept and the Walks variable contributes to the model significantly. Since the beta estimators and the standard errors get recomputed, a shift in f- and thus p-values can occur causing the change in the number of significant attributes.
+
+Investigate the model graphically for the training set
+```{r, echo=TRUE,fig.width=5,fig.height=3}
+plot(train$Salary,predict(res_reduced, train),col=2)
+points(train$Salary,predict(res, train))
+title(main = "Training set predictions for reduced (red) and full model")
+abline(c(0,1))
+```
+
+Investigate the model graphically for the test set
+```{r, echo=TRUE,fig.width=5,fig.height=3}
+plot(test$Salary,predict(res_reduced, test),col=2)
+points(test$Salary,predict(res, test))
+title(main = "Test set predictions for reduced (red) and full model")
+abline(c(0,1))
+```
+
+Investigate the MSE of the reduced model
+```{r, echo=TRUE}
+mse_lm_red_train=MSE(res_reduced,train)
+mse_lm_red_test=MSE(res_reduced,test)
+df <- data.frame(model='reduced_lm',mse_train = mse_lm_red_train, mse_test = mse_lm_red_test)
+df
+```
+
+I got higher number for MSE. This usually happens when we exclude variables from the model to have a simpler one with less independent variables. This simpler one could usually not predict the output variable so efficiently. 
+
+Model comparison with ANOVA
+```{r, echo=TRUE}
+anova(res_reduced,res)
+```
+
+The ANOVA table says, we can reject the null hipothesis of keeping the reduced model. We have to go for the full model instead. This decision corresponds to the higher number of MSE that I got for the reduce model.
+
+</div></pre>

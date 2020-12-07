@@ -1,0 +1,280 @@
+---
+title: "Exercise 4"
+subtitle: "for Advanced Methods for Regression and Classification"
+author: "Eszter Katalin Bognar"
+date: "04.11.2020"
+output: pdf_document
+---
+
+To prevent cutting the pdf
+```{r, echo = F}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+# Data preparation
+
+Load and view the data
+```{r, echo=TRUE}
+load("dat.RData")
+```
+
+Remove row 484 with an arbitrary value that is bigger than 25 while the others are around 0
+```{r, echo=TRUE}
+d = d[!d['X201'] > 25,] 
+
+```
+
+Create train/test set
+```{r, echo=TRUE}
+set.seed(1234)
+smp_size <- floor(0.67* nrow(d))
+train_ind <- sample(seq_len(nrow(d)), size = smp_size)
+```
+
+# Data modeling
+
+## Full model
+
+Estimate the full regression model
+```{r, echo=TRUE}
+model.full <- lm(y ~ ., d[train_ind,])
+#summary(model.full)
+```
+
+If we check the model summary we can see that none of the variables are having highly significant contribution to the model. We can also identify some NAs meaning the variables are linearly correlated.
+
+Plot y versus ˆy for training and test data
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+plot(d[-train_ind,]$y, predict(model.full, d[-train_ind,]))
+title(main = "Test predictions for the full model")
+abline(c(0,1))
+```
+
+Define MSE function (also for the trimmed one)
+```{r, echo=TRUE}
+MSE<- function(model,data){
+mean((data$y - predict.lm(model, data)) ^ 2)
+}
+
+MSE_trimmed<- function(model,data){
+#calculate and sort the differences 
+diffs <-  sort((data$y - predict.lm(model, data)) ^ 2)
+#calculate the mean by trimming the upper 10% of the squared differences
+mean(head(diffs, -(length(diffs) * 0.1)))
+}
+```
+
+Compute MSE for test data
+```{r, echo=TRUE}
+#mse test using lm
+mse_test=MSE(model.full,data=d[-train_ind,])
+#mse test using lm (trimmed)
+mse_test_trimmed=MSE_trimmed(model.full,data=d[-train_ind,])
+
+#save results in a df
+df_lm <- data.frame(model='model.full',mse_test = mse_test, mse_test_trimmed = mse_test_trimmed)
+df_lm
+```
+The MSE for the test set doesn't really good (comparing to the models built in the previous exercises with the reduced number of variables in the data set). The prediction on the test set have some outliers that causing higher number of MSE. 
+I got the following warning: "prediction from a rank-deficient fit may be misleading". This warning checks if the rank of the data matrix is at least equal to the number of parameters we want to fit. It is because, some of our dependent variables has NA for coefficients given as we can see in the model summary. This is often due to multicollinearity problem: that predictor variable is linearly dependent on other predictor variables
+
+## Principal component regression
+
+Estimate the PRC model on the full dataset
+```{r, echo=TRUE,message=FALSE}
+#install.packages("pls")
+library(pls)
+#set.seed(1234)
+model.pcr <- pcr(y ~ ., data=d, subset=train_ind, scale = TRUE, validation = "CV", segments=10, segment.type="random", ncomp=100)    
+#summary(model.pcr)
+```
+
+Plot the obtained prediction errors from cross-validation
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+plot(RMSEP(model.pcr), legendpos = "topright")
+cverr <- RMSEP(model.pcr)$val[1,,]
+imin <- which.min(cverr)-1
+print(imin)
+```
+Based on the validation plot, around 10 variables seems to be optimal.
+
+Fit a pcr model with 10 components
+```{r, echo=TRUE}
+model.pcr = pcr(y ~ ., data=d, subset=train_ind, scale = TRUE, validation = "CV", segments=10, ncomp=35)
+summary(model.pcr)
+```
+
+Create y-y_hat plot
+```{r, echo=TRUE}
+pred.pcr=predict(model.pcr,newdata = d[-train_ind,],ncomp=35)
+plot(d[-train_ind,]$y,pred.pcr)
+title(main = "Test predictions for the pcr model")
+abline(c(0,1))
+```
+
+
+Define MSE function for pcr (also for the trimmed one) using predict instead of predict.lm
+```{r, echo=TRUE}
+MSE<- function(model,data,ncomp){
+mean((data$y - predict(model, data,ncomp)) ^ 2)
+}
+
+MSE_trimmed<- function(model,data,ncomp){
+#calculate and sort the differences 
+diffs <-  sort((data$y - predict(model, data,ncomp)) ^ 2)
+#calculate the mean by trimming the upper 10% of the squared differences
+mean(head(diffs, -(length(diffs) * 0.1)))
+}
+```
+
+Compute MSE for test data
+```{r, echo=TRUE}
+#mse test using lm
+mse_test=MSE(model.pcr,data=d[-train_ind,],35)
+#mse test using lm (trimmed)
+mse_test_trimmed=MSE_trimmed(model.pcr,data=d[-train_ind,],35)
+
+#save results in a df
+df_pcr <- data.frame(model='model.pcr',mse_test = mse_test, mse_test_trimmed = mse_test_trimmed)
+df_pcr
+```
+For the pcr model, the MSEs are getting much lower. This MSE is already comparable with the MSE of the models from the previous exercise (best subset, stepwise forward/backward)
+
+Plotting the results
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+predplot(model.pcr, ncomp = 10, which = c("validation","test"), newdata = d[-train_ind,])
+```
+
+## Partial least squares regression (PLS)
+
+Estimate the PRC model on the full dataset
+```{r, echo=TRUE,message=FALSE}
+#install.packages("pls")
+library(pls)
+set.seed(1234)
+model.pls <- plsr(y ~ ., data=d, subset=train_ind, scale = TRUE, validation = "CV", segments=10, segment.type="random",ncomp=30)    
+summary(model.pls)
+```
+
+Plot the obtained prediction errors from cross-validation
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+plot(RMSEP(model.pls), legendpos = "topright")
+cverr <- RMSEP(model.pls)$val[1,,]
+imin <- which.min(cverr)-1
+print(imin)
+```
+
+Fit a pcr model with 4 components
+```{r, echo=TRUE}
+model.pls = plsr(y ~ ., data=d, subset=train_ind, scale = TRUE, validation = "CV", segments=10, ncomp=4)
+summary(model.pls)
+```
+
+Create y-y_hat plot
+```{r, echo=TRUE}
+
+pred.pcr=predict(model.pls,newdata = d[-train_ind,],ncomp=4)
+plot(d[-train_ind,]$y,pred.pcr)
+title(main = "Test predictions for the pcr model")
+abline(c(0,1))
+```
+
+Compute MSE for test data
+```{r, echo=TRUE}
+#mse test using lm
+mse_test=MSE(model.pls,data=d[-train_ind,],4)
+#mse test using lm (trimmed)
+mse_test_trimmed=MSE_trimmed(model.pls,data=d[-train_ind,],4)
+
+#save results in a df
+df_pls <- data.frame(model='model.pls',mse_test = mse_test, mse_test_trimmed = mse_test_trimmed)
+df_pls
+```
+
+Plotting the results
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+predplot(model.pls, ncomp = 4, which = c("validation","test"), newdata = d[-train_ind,])
+```
+
+Comparing the results
+```{r, echo=TRUE}
+df_res=rbind(df_pcr,df_pls)
+df_res
+```
+The results for the pls model are slightly better comparing the MSEs. Another advantage of the pls model that it has only 4 components while the pcr has 10. 
+
+Recreate the models with 25 components
+```{r, echo=TRUE}
+model.pcr <- plsr(y ~ ., data=d, subset=train_ind, scale = TRUE, validation = "CV", segments=10, segment.type="random",ncomp=25)
+model.pls <- plsr(y ~ ., data=d, subset=train_ind, scale = TRUE, validation = "CV", segments=10, segment.type="random",ncomp=25)
+```
+
+Construct the components vs 10%-trimmed MSE plots for the models
+Trim the cv results and calculate the mean
+```{r, echo=TRUE}
+pcr_cv = vector()
+pls_cv = vector()
+ncomp=25
+for (cv in 1:ncomp){
+  res_pcr=model.pcr$validation$pred[,1,cv]
+  diffs_pcr <-  sort((d[names(res_pcr),]$y - res_pcr) ^ 2)
+  pcr_cv=c(pcr_cv,mean(head(diffs_pcr, -(length(diffs_pcr) * 0.1))))
+  
+  res_pls=model.pls$validation$pred[,1,cv]
+  diffs_pls <-  sort((d[names(res_pls),]$y - res_pls) ^ 2)
+  pls_cv=c(pls_cv,mean(head(diffs_pls, -(length(diffs_pls) * 0.1))))
+}
+```
+
+Plot the results
+```{r, echo=TRUE,fig.width=10,fig.height=4}
+par(mfrow=c(1,2))
+plot(pcr_cv, type='l',xlab='number of components',ylab='trimmed MSE', main='components vs 10%-trimmed MSE (PCR)')
+plot(pls_cv, type='l',xlab='number of components',ylab='trimmed MSE', main='components vs 10%-trimmed MSE (PLS)')
+```
+We can see that both models are almost similar having the lowest trimmed MSE by 7 components and the trimmed MSE values are very good. 
+
+## PCR by hand
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+
+#prepare dataset, do pca
+X <- d[,-1]
+Xm <- data.matrix(X)
+pc <- princomp(Xm[train_ind,],cor=TRUE)
+
+#using only 10 components like before with the previous pcr model
+df <- data.frame(y=d$y[train_ind],pc$scores[,1:10])
+
+#prepare test data
+Xmtest <- scale(Xm[-train_ind,],pc$center,pc$scale)
+Ztest <- Xmtest %*% pc$loadings
+dftest <- data.frame(y=d$y[-train_ind],Ztest[,c(1:10)])
+
+#train the model
+lmtrain <- lm(y ~ ., data=df)
+
+#evaluate the model
+pred.pc <- predict(lmtrain,dftest)
+plot(d$y[-train_ind],pred.pc)
+abline(c(0,1))
+
+#simple MSE
+mse_test=mean((d$y[-train_ind] - pred.pc) ^ 2)
+
+#trimmed MSE
+diffs_pc <-  sort((d$y[-train_ind] - pred.pc) ^ 2)
+mse_test_trimmed= mean(head(diffs_pc, - (length(diffs_pc) * 0.1)))
+
+#create result df
+df_pc <- data.frame(model='model.pc_by__hand',mse_test = mse_test, mse_test_trimmed = mse_test_trimmed)
+```
+
+Model comparison
+```{r, echo=TRUE}
+df_res=rbind(df_pcr,df_pc)
+df_res
+```
+We got exactly the same results as for the PCR model with 10 components before. 
+
+</div></pre>

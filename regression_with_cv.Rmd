@@ -1,0 +1,277 @@
+---
+title: "Exercise 3"
+subtitle: "for Advanced Methods for Regression and Classification"
+author: "Eszter Katalin Bognar"
+date: "28.10.2020"
+output: pdf_document
+---
+
+To prevent cutting the pdf
+```{r}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+# Data preparation
+
+Load and view the data
+```{r, echo=TRUE}
+load("dat.RData")
+#head(d)
+```
+
+Select the required subset of attributes
+```{r, echo=TRUE}
+library(tidyverse)
+ds <- d %>% select(y,X20:X65)
+```
+
+Create train/test set
+```{r, echo=TRUE}
+set.seed(123)
+smp_size <- floor(0.67* nrow(ds))
+train_ind <- sample(seq_len(nrow(ds)), size = smp_size)
+```
+
+# Data modeling
+
+## Full model
+
+Remove X61 (we know from the last exercise that there is a linear dependency with X22)
+```{r, echo=TRUE}
+ds = select(ds, -X61)
+```
+
+Estimate the full regression model
+```{r, echo=TRUE}
+model.full <- lm(y ~ ., ds[train_ind,])
+summary(model.full)
+```
+
+Define MSE function (also for the trimmed one)
+```{r, echo=TRUE}
+MSE<- function(model,data){
+mean((data$y - predict.lm(model, data)) ^ 2)
+}
+
+MSE_trimmed<- function(model,data){
+mean((data$y - predict.lm(model, data)) ^ 2,trim=0.1)
+}
+```
+
+Compute MSE for training and test data
+```{r, echo=TRUE}
+#mse train and test using lm
+mse_train=MSE(model.full,data=ds[train_ind,])
+mse_test=MSE(model.full,data=ds[-train_ind,])
+
+#save results in a df
+df_lm <- data.frame(model='model.full',mse_train = mse_train, mse_test = mse_test)
+df_lm
+
+#mse train and test using lm (trimmed)
+mse_train=MSE_trimmed(model.full,data=ds[train_ind,])
+mse_test=MSE_trimmed(model.full,data=ds[-train_ind,])
+
+#save results in a df
+df_lm_trimmed <- data.frame(model='model.full',mse_train = mse_train, mse_test = mse_test)
+df_lm_trimmed
+```
+We got better fit, less MSE on the training set (also for the trimmed MSE and the trimmed MSE is lower). We can also see this on the y_hat - y plots of the train and test sets. 
+The mean is the sum of the observations divided by the number of observations. The mean can be heavily influenced by extreme values in the tails of a variable. The trimmed mean compensates for this by dropping a certain percentage of values on the tails. This can be seen on the results (lower MSE, better fit using the trimmed MSE).
+
+Plot y versus ˆy for training and test data
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+plot(ds[train_ind,]$y, predict(model.full, ds[train_ind,]))
+title(main = "Train set predictions for the full model")
+abline(c(0,1))
+
+plot(ds[-train_ind,]$y, predict(model.full, ds[-train_ind,]))
+title(main = "Test predictions for the full model")
+abline(c(0,1))
+```
+
+## Model evaluation using cross-validation
+
+Estimate the full regression model on the full dataset
+```{r, echo=TRUE}
+model.full <- lm(y ~ ., data=ds)
+summary(model.full)
+```
+
+Model evaluation using cross-validation
+```{r, echo=TRUE}
+#install.packages("cvTools")
+library(cvTools)
+k2=cvFit(model.full, data = ds, y = ds$y, cost = mspe, 
+    K = 2, R = 50, seed = 1234)
+k5=cvFit(model.full, data = ds, y = ds$y, cost = mspe, 
+    K = 5, R = 50, seed = 1234)
+k10=cvFit(model.full, data = ds, y = ds$y, cost = mspe, 
+    K = 10, R = 50, seed = 1234)
+k20=cvFit(model.full, data = ds, y = ds$y, cost = mspe, 
+    K = 20, R = 50, seed = 1234)
+k50=cvFit(model.full, data = ds, y = ds$y, cost = mspe, 
+    K = 50, R = 50, seed = 1234)
+k100=cvFit(model.full, data = ds, y = ds$y, cost = mspe, 
+    K = 100, R = 50, seed = 1234)
+cvFits <-  cvSelect(k2 = k2, k5 = k5, k10 = k10,k20 = k20,k50 = k50,k100 = k100)
+```
+
+Visualizing cross-validation results using parallel boxplots
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+cvFits
+bwplot(cvFits)
+```
+
+Model evaluation using cross-validation (leave-one-out). I used leave-one-out cv by setting k to n (number of observations in the dataset). Setting type="leave-out-out" doesn't really worked...
+```{r, echo=TRUE}
+#install.packages("cvTools")
+library(cvTools)
+leave_one_out=cvFit(model.full, data = ds, y = ds$y, cost = mspe, K = nrow(ds), seed = 1234,type="leave-one-out")
+print(leave_one_out)
+```
+
+We got much lower MSE-s using cv instead of evaluating using random train/test splits. We obtained the best results with the leave-one-out cross validation. As the number of folds increases, we got a more precise indicator about the prediction power of the lm model (outliers are having less impact on the MSE). This can be also seen on the boxplots. (Even though the cvSelect function allows to compare cross-validation results obtained with a different number of folds, such comparisons should be made with care and a warning is issued.) 
+
+
+Model evaluation using cross-validation with trimmed MSE
+```{r, echo=TRUE}
+#install.packages("cvTools")
+library(cvTools)
+#??cvFit
+k2=cvFit(model.full, data = ds, y = ds$y, cost = tmspe, costArgs = list(trim = 0.1),
+    K = 2, R = 50, seed = 1234)
+k5=cvFit(model.full, data = ds, y = ds$y, cost = tmspe, costArgs = list(trim = 0.1),
+    K = 5, R = 50, seed = 1234)
+k10=cvFit(model.full, data = ds, y = ds$y, cost = tmspe, costArgs = list(trim = 0.1),
+    K = 10, R = 50, seed = 1234)
+k20=cvFit(model.full, data = ds, y = ds$y, cost = tmspe,costArgs = list(trim = 0.1),
+    K = 20, R = 50, seed = 1234)
+k50=cvFit(model.full, data = ds, y = ds$y, cost = tmspe, costArgs = list(trim = 0.1),
+    K = 50, R = 50, seed = 1234)
+k100=cvFit(model.full, data = ds, y = ds$y, cost = tmspe, costArgs = list(trim = 0.1),
+    K = 100, R = 50, seed = 1234)
+cvFits <-  cvSelect(k2 = k2, k5 = k5, k10 = k10,k20 = k20,k50 = k50,k100 = k100)
+
+```
+
+Visualizing cross-validation results using parallel boxplots (trimmed MSE)
+```{r, echo=TRUE}
+cvFits
+bwplot(cvFits)
+```
+
+Model evaluation using cross-validation (leave-one-out, trimmed MSE)
+```{r, echo=TRUE}
+#install.packages("cvTools")
+library(cvTools)
+leave_one_out=cvFit(model.full, data = ds, y = ds$y, cost = tmspe, costArgs = list(trim = 0.1), K = nrow(ds), seed = 1234,type="leave-one-out")
+print(leave_one_out)
+```
+The trimmed MSE-s are much smaller and we can see less outliers on the boxplots. 
+
+
+## MSE with bootstrapping
+```{r, echo=TRUE}
+BS_MSE = function (nboots,data) {
+MSE_sum=0
+MSE_sum_out=0
+  for(i in 1:nboots)
+  {
+    boot <- sample(1:nrow(data), nrow(data), replace=TRUE) 
+    
+    model = lm(y ~ ., data, subset=boot)
+    
+    MSE_sum = MSE_sum + mean((data[boot,]$y - predict.lm(model, data[boot,])) ^ 2)
+    
+    MSE_sum_out = MSE_sum_out + mean((data[-boot,]$y - predict.lm(model, data[-boot,])) ^ 2) 
+  }
+
+  MSE_sum=MSE_sum/nboots
+  MSE_sum_out=MSE_sum_out/nboots
+  sprintf("MSE_boot: %f, MSE_boot_out: %f", MSE_sum, MSE_sum_out)
+}
+```
+
+Bootrapping results
+```{r, echo=TRUE}
+BS_MSE(nboots=1000,data=ds)
+```
+We obtained better results for evaluating on the original observations and worse results for evaluating on the samples that aren't among the bootstrap examples. 
+
+Bootstrapping (trimmed)
+```{r, echo=TRUE}
+BS_MSE = function (nboots,data) {
+MSE_sum=0
+MSE_sum_out=0
+  for(i in 1:nboots)
+  {
+    boot <- sample(1:nrow(data), nrow(data), replace=TRUE) 
+    
+    model = lm(y ~ ., data, subset=boot)
+    
+    MSE_sum = MSE_sum + mean((data[boot,]$y - predict.lm(model, data[boot,])) ^ 2, trim=0.1)
+    
+    MSE_sum_out = MSE_sum_out + mean((data[-boot,]$y - predict.lm(model, data[-boot,])) ^ 2, trim=0.1) 
+  }
+
+  MSE_sum=MSE_sum/nboots
+  MSE_sum_out=MSE_sum_out/nboots
+  sprintf("MSE_boot: %f, MSE_boot_out: %f", MSE_sum, MSE_sum_out)
+}
+```
+
+Bootstrapping results (trimmed)
+```{r, echo=TRUE}
+BS_MSE(nboots=1000,data=ds)
+```
+Trimmed MSE is lower again, we got much lower MSE for evaluating on the unseen data.
+
+## Stepwise regression (backward) and best subset regression evaluation
+```{r, results = FALSE}
+#backward method
+
+model.step.backward <- step(model.full,ds)
+summary(model.step.backward)
+```
+
+Model from the best subset regression (from the last exercise)
+```{r, echo=TRUE}
+#model summary
+model.best <- lm(y~X29+X32+X34+X36+X46+X48+X52+X58+X63+X64,data=ds,subset=train_ind)
+summary(model.best)
+```
+Compute MSE using cv (k=5)
+```{r, echo=TRUE}
+cv_backward=cvFit(model.step.backward, data = ds, y = ds$y, cost = mspe,
+    K = 5, R = 50, seed = 1234)
+cv_best=cvFit(model.best, data = ds, y = ds$y, cost = mspe,
+    K = 5, R = 50, seed = 1234)
+sprintf("cv_backward: %f, cv_best: %f", cv_backward$cv, cv_best$cv)
+```
+Compute MSE using bootstrap with leave-out observations
+```{r, echo=TRUE}
+BS_MSE = function (nboots,data, model) {
+MSE_sum_out=0
+  for(i in 1:nboots)
+  {
+    boot <- sample(1:nrow(data), nrow(data), replace=TRUE) 
+    
+    MSE_sum_out = MSE_sum_out + mean((data[-boot,]$y - predict.lm(model, data[-boot,])) ^ 2) 
+  }
+
+  MSE_sum_out=MSE_sum_out/nboots
+  sprintf("MSE_boot: %f", MSE_sum_out)
+}
+```
+
+
+```{r, echo=TRUE}
+BS_MSE(nboots=1000,data=ds,model.step.backward)
+BS_MSE(nboots=1000,data=ds,model.best)
+```
+The MSE is lower using the bootstrap evaluation. The results are better using these models than the full model.
+
+
+</div></pre>

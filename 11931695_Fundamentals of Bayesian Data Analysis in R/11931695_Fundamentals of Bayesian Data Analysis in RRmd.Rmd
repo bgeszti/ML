@@ -1,0 +1,454 @@
+---
+title: "Fundamentals of Bayesian Data Analysis in R"
+subtitle: "for Exercises"
+author: "Eszter Katalin Bognar"
+date: "16-06-2020"
+output: pdf_document
+---
+
+# Fundamentals of Bayesian Data Analysis in R
+
+## The prop_model function
+
+```{r, echo=T, eval=T, tidy = T}
+prop_model <- function(data = c(), prior_prop = c(1, 1), n_draws = 10000) {
+  library(tidyverse)
+  data <- as.logical(data)
+  # data_indices decides what densities to plot between the prior and the posterior
+  # For 20 datapoints and less we're plotting all of them.
+  data_indices <- round(seq(0, length(data), 
+                            length.out = min(length(data) + 1, 20)))
+
+  # dens_curves will be a data frame with the x & y coordinates for the 
+  # denities to plot where x = proportion_success and y = probability
+  proportion_success <- c(0, seq(0, 1, length.out = 100), 1)
+  dens_curves <- map_dfr(data_indices, function(i) {
+    value <- ifelse(i == 0, "Prior", ifelse(data[i], "Success", "Failure"))
+    label <- paste0("n=", i)
+    probability <- dbeta(proportion_success,
+                         prior_prop[1] + sum(data[seq_len(i)]),
+                         prior_prop[2] + sum(!data[seq_len(i)]))
+    probability <- probability / max(probability)
+    data_frame(value, label, proportion_success, probability)
+  })
+  # Turning label and value into factors with the right ordering for the plot
+  dens_curves$label <- fct_rev(factor(dens_curves$label, 
+                                      levels =  paste0("n=", data_indices )))
+  dens_curves$value <- factor(dens_curves$value, 
+                              levels = c("Prior", "Success", "Failure"))
+
+  p <- ggplot(dens_curves, aes(x = proportion_success, y = label,
+                               height = probability, fill = value)) +
+    ggridges::geom_density_ridges(stat="identity", color = "white", alpha = 0.8,
+                                  panel_scaling = TRUE, size = 1) +
+    scale_y_discrete("", expand = c(0.01, 0)) +
+    scale_x_continuous("Underlying proportion of success") +
+    scale_fill_manual(values = hcl(120 * 2:0 + 15, 100, 65), name = "", drop = FALSE,
+                      labels =  c("Prior   ", "Success   ", "Failure   ")) +
+    ggtitle(paste0(
+      "Binomial model - Data: ", sum(data),  
+      " successes, " , sum(!data), " failures")) +
+    theme_light() +
+    theme(legend.position = "top")
+  print(p)
+
+  # Returning a sample from the posterior distribution that can be further 
+  # manipulated and inspected
+  posterior_sample <- rbeta(n_draws, prior_prop[1] + 
+                              sum(data), prior_prop[2] + sum(!data))
+  invisible(posterior_sample)
+}
+```
+
+## Coin flips with prop_model
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+data <- c(1, 0, 0, 1)
+prop_model(data)
+#the information that the model have regarding the underlying proportion of heads: 
+#It's most likely around 50%, but there is large uncertainty.
+```
+
+## Zombie drugs with prop_model
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+# Update the data and rerun prop_model
+data = c(1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+prop_model(data)
+#the information that the model have regarding the underlying proportion of heads: 
+#It's most likely Between 5% to 40%.
+```
+
+## Samples and posterior summaries
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+data = c(1, 0, 0, 1, 0, 0,
+         0, 0, 0, 0, 0, 0, 0)
+
+# Extract and explore the posterior
+posterior <- prop_model(data)
+head(posterior)
+
+# Edit the histogram
+hist(posterior,breaks = 30,xlim = c(0, 1),col = "palegreen4")
+```
+
+## Summarizing the zombie drug experiment
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+data = c(1, 0, 0, 1, 0, 0,
+         0, 0, 0, 0, 0, 0, 0)
+posterior <- prop_model(data)
+#drawing histogram
+hist(posterior, breaks = 30, xlim = c(0, 1), col = "palegreen4")
+# Calculate the median
+median(posterior)
+# Calculate the credible interval
+quantile(posterior, c(0.05, 0.95))
+# Calculate the probability
+sum(posterior > 0.07) / length(posterior)
+```
+
+# How does Bayesian inference work?
+
+## Take a generative model for a spin
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+# The generative zombie drug model
+# Set parameters
+prop_success <- sum(data)
+n_zombies <- 100
+# Simulating data
+data <- c()
+for(zombie in 1:n_zombies) {
+  data[zombie] <- runif(1, min = 0, max = 1) < prop_success
+}
+# Count cured
+data <- prop_success
+data
+```
+
+## Take the binomial distribution for a spin
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+# n The number of times you want to run the generative model
+#  size The number of trials. (For example, the number of zombies you're giving the drug.)
+#  prob The underlying proportion of success as a number between 0.0 and 1.0.
+rbinom(n = 200, size = 100, prob = 0.42)
+```
+
+## Adding a prior to the model
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+n_samples <- 100000
+n_ads_shown <- 100
+proportion_clicks <- runif(n_samples, min = 0.0, max = 0.2)
+n_visitors <- rbinom(n = n_samples, size = n_ads_shown, prob = proportion_clicks)
+
+# Visualize proportion clicks
+hist(proportion_clicks)
+
+# Visualize n_visitors
+hist(n_visitors)
+```
+
+## Bayesian models and conditioning
+
+```{r, echo=T, eval=F, tidy = T,fig.width=6, fig.height=4}
+# Assign posterior to a new variable called prior
+prior <- posterior
+
+# Take a look at the first rows in prior
+head(prior)
+
+n_samples <-  nrow(prior)
+n_ads_shown <- 100
+
+prior$n_visitors <- rbinom(n_samples, size = n_ads_shown, prob = prior$proportion_clicks)
+
+hist(prior$n_visitors)
+
+# Calculate the probability that you will get 5 or more visitors
+sum(prior$n_visitors >= 5) / length(prior$n_visitors)
+```
+
+# Why use Bayesian Data Analysis?
+
+## Explore using the Beta distribution as a prior
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+# Modify the parameters
+beta_sample <- rbeta(n = 1000000, shape1 = 100, shape2 = 20)
+
+# Visualize the results
+hist(beta_sample)
+```
+## Using a prior with Beta distribution
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+n_draws <- 100000
+n_ads_shown <- 100
+
+# Change the prior on proportion_clicks
+proportion_clicks <- 
+  rbeta(n_draws, shape1 = 5, shape2 = 95)
+n_visitors <- 
+  rbinom(n_draws, size = n_ads_shown, 
+         prob = proportion_clicks)
+prior <- 
+  data.frame(proportion_clicks, n_visitors)
+posterior <- 
+  prior[prior$n_visitors == 13, ]
+
+# This plots the prior and the posterior in the same plot
+par(mfcol = c(2, 1))
+hist(prior$proportion_clicks, 
+     xlim = c(0, 0.25))
+hist(posterior$proportion_clicks, 
+     xlim = c(0, 0.25))
+```
+
+## Visualial comparing of posteriors 
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+# Define parameters
+n_draws <- 100000
+n_ads_shown <- 100
+proportion_clicks <- runif(n_draws, min = 0.0, max = 0.2)
+n_visitors <- rbinom(n = n_draws, size = n_ads_shown, 
+                     prob = proportion_clicks)
+prior <- data.frame(proportion_clicks, n_visitors)
+
+# Create the posteriors for video and text ads
+posterior_video <- prior[prior$n_visitors == 13, ]
+posterior_text <- prior[prior$n_visitors == 6, ]
+
+# Visualize the posteriors
+hist(posterior_video$proportion_clicks, xlim = c(0, 0.25))
+hist(posterior_text$proportion_clicks, xlim = c(0, 0.25))
+```
+
+## Calculating the posterior difference
+
+```{r, echo=T, eval=F, tidy = T,fig.width=6, fig.height=4}
+posterior <- data.frame(video_prop = posterior_video$proportion_clicks[1:4000],
+                        text_prop = posterior_text$proportion_click[1:4000])
+
+# Calculate the posterior difference: video_prop - text_prop
+posterior$prop_diff <- posterior$video_prop - posterior$text_prop 
+
+# Visualize prop_diff
+hist(posterior$prop_diff)
+
+# Calculate the median of prop_diff
+median(posterior$prop_diff)
+
+# Calculate the proportion
+sum(posterior$prop_diff>0)/length(posterior$prop_diff)
+```
+
+## Decision analysis
+
+```{r, echo=T, eval=F, tidy = T,fig.width=6, fig.height=4}
+# Add the column posterior$profit_diff
+posterior$profit_diff <- posterior$video_profit - posterior$text_profit
+
+# Visualize posterior$profit_diff
+hist(posterior$profit_diff)
+
+# Calculate a "best guess" for the difference in profits
+median(posterior$profit_diff)
+
+# Calculate the probability that text ads are better than video ads
+sum(posterior$profit_diff < 0) / length(posterior$profit_diff)
+```
+
+## The Poisson distribution
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+# Simulate from a Poisson distribution and visualize the result
+x <- rpois(n = 10000, lambda = 11.5)
+hist(x)
+
+# Calculate the probability of break-even
+sum(x >= 15)/ length(x)
+
+```
+
+# Bayesian inference with Bayes' theorem
+
+## Probability rules
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+#Calculate the probability of drawing any of the four aces
+prob_to_draw_ace <- 4/52
+#Calculate the probability of picking four aces in a row
+prob_to_draw_four_aces <- (4/52) * (3/51) * (2/50) * (1/49)
+```
+
+## Calculating likelihoods
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+n_ads_shown <- 100
+proportion_clicks <- 0.1
+prob_13_visitors <- dbinom(13, 
+    size = n_ads_shown, prob = proportion_clicks)
+prob_13_visitors
+```
+
+## Calculating probabilities with dbinom
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+# Change the code according to the instructions
+n_ads_shown <- 100
+proportion_clicks <- seq(0, 1, by = 0.01)
+n_visitors <- 13
+prob <- dbinom(n_visitors, 
+    size = n_ads_shown, prob = seq(0, 1, by = 0.01))
+prob
+
+plot(proportion_clicks, prob, type = "h")
+```
+
+## Calculating a joint distribution
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+n_ads_shown <- 100
+proportion_clicks <- seq(0, 1, by = 0.01)
+n_visitors <- seq(0, 100, by = 1)
+pars <- expand.grid(proportion_clicks = proportion_clicks,
+                    n_visitors = n_visitors)
+pars$prior <- dunif(pars$proportion_clicks, min = 0, max = 0.2)
+pars$likelihood <- dbinom(pars$n_visitors, 
+    size = n_ads_shown, prob = pars$proportion_clicks)
+
+# Add the column pars$probability and normalize it
+pars$probability <- pars$likelihood * pars$prior
+pars$probability <- pars$probability / sum(pars$probability)
+```
+
+## Conditioning on the data 
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+n_ads_shown <- 100
+proportion_clicks <- seq(0, 1, by = 0.01)
+n_visitors <- seq(0, 100, by = 1)
+pars <- expand.grid(proportion_clicks = proportion_clicks,
+                    n_visitors = n_visitors)
+pars$prior <- dunif(pars$proportion_clicks, min = 0, max = 0.2)
+pars$likelihood <- dbinom(pars$n_visitors, 
+    size = n_ads_shown, prob = pars$proportion_clicks)
+pars$probability <- pars$likelihood * pars$prior
+pars$probability <- pars$probability / sum(pars$probability)
+# Condition on the data 
+pars <- pars[pars$n_visitors == 6, ]
+# Normalize again
+pars$probability <- pars$probability / sum(pars$probability)
+# Plot the posterior pars$probability
+plot(pars$proportion_clicks, pars$probability, type = "h")
+```
+
+## Bayes' theorem
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+pars$probability <- pars$likelihood * pars$prior
+pars$probability <- pars$probability / sum(pars$probability)
+```
+
+# More parameters, more data, and more Bayes
+
+## Normal distribution
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+# Assign mu and sigma
+mu <- 3500
+sigma <- 600
+
+weight_distr <- rnorm(n = 100000, mean = mu, sd = sigma)
+hist(weight_distr, 60, xlim = c(0, 6000), col = "lightgreen")
+
+# Create weight
+weight <- seq(0, 6000, by = 100)
+
+# Calculate likelihood
+likelihood <- dnorm(weight, mu, sigma)
+
+# Plot the distribution of weight
+plot(weight,likelihood,type="h")
+```
+
+## A Bayesian model of Zombie IQ
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+# The IQ of a bunch of zombies
+iq <- c(55, 44, 34, 18, 51, 40, 40, 49, 48, 46)
+# Defining the parameter grid
+pars <- expand.grid(mu = seq(0, 150, length.out = 100), 
+                    sigma = seq(0.1, 50, length.out = 100))
+# Defining and calculating the prior density for each parameter combination
+pars$mu_prior <- dnorm(pars$mu, mean = 100, sd = 100)
+pars$sigma_prior <- dunif(pars$sigma, min = 0.1, max = 50)
+pars$prior <- pars$mu_prior * pars$sigma_prior
+# Calculating the likelihood for each parameter combination
+for(i in 1:nrow(pars)) {
+  likelihoods <- dnorm(iq, pars$mu[i], pars$sigma[i])
+  pars$likelihood[i] <- prod(likelihoods)
+}
+# Calculate the probability of each parameter combination
+pars$probability <- pars$likelihood * pars$prior
+pars$probability <- pars$probability/sum(pars$probability)
+```
+
+
+## Sampling from the zombie posterior
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+sample_indices <- sample( 1:nrow(pars), size = 10000,
+    replace = TRUE, prob = pars$probability)
+head(sample_indices)
+
+# Sample from pars to calculate some new measures
+pars_sample <- pars[sample_indices, c("mu", "sigma")]
+
+# Visualize pars_sample
+hist(pars_sample$mu)
+
+# Calculate the 0.025, 0.5 and 0.975 quantiles of pars_sample$mu
+
+quantile(pars_sample$mu, c(0.025, 0.5, .975))
+```
+
+## what range of zombie IQs should we expect?
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+pred_iq <- rnorm(10000, mean = pars_sample$mu, 
+                 sd = pars_sample$sigma)
+# Visualize pred_iq
+hist(pred_iq)
+
+# Calculate the probability of a zombie being "smart" (+60 IQ)
+pred_iq <- rnorm(10000, mean=pars_sample$mu, sd=pars_sample$sigma)
+
+# the Pr that the next zombie you'll meet will have an IQ of >=60 
+sum(pred_iq >= 60)/length(pred_iq) 
+```
+
+## BEST package
+
+```{r, echo=T, eval=T, tidy = T,fig.width=6, fig.height=4}
+# The IQ of zombies on a regular diet and a brain based diet.
+iq_brains <- c(44, 52, 42, 66, 53, 42, 55, 57, 56, 51)
+iq_regular <- c(55, 44, 34, 18, 51, 40, 40, 49, 48, 46)
+
+# Calculate the mean difference in IQ between the two groups
+mean(iq_brains) - mean(iq_regular)
+
+# Fit the BEST model to the data from both groups
+library(BEST)
+best_posterior <- BESTmcmc(iq_brains, iq_regular)
+
+# Plot the model result
+plot(best_posterior)
+```
+
+</div></pre>

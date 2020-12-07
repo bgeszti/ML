@@ -1,0 +1,38 @@
+﻿Station.Number,Location,LatD,LatM,LatS,LongD,LongM,LongS,Depth MLW,Bay area
+657,Rio Vista,38.00,9.00,1.00,-121.00,41.00,3.00,10.1,North Bay
+649,Sacramento River,38.00,3.00,6.00,-121.00,48.00,0.00,10.1,North Bay
+2,Chain Island,38.00,3.00,8.00,-121.00,51.00,1.00,11.3,North Bay
+3,Pittsburg,38.00,3.00,1.00,-121.00,52.00,8.00,11.3,North Bay
+4,Simmons Point,38.00,2.00,9.00,-121.00,56.00,1.00,11.6,North Bay
+5,Middle Ground,38.00,3.00,6.00,-121.00,58.00,8.00,9.8,North Bay
+6,Roe Island,38.00,3.00,9.00,-122.00,2.00,1.00,10.1,North Bay
+7,Avon Pier,38.00,2.00,9.00,-122.00,5.00,8.00,11.6,North Bay
+8,Martinez,38.00,1.00,8.00,-122.00,9.00,1.00,14.3,North Bay
+9,Benicia,38.00,3.00,4.00,-122.00,11.00,1.00,34.4,North Bay
+10,Crockett,38.00,3.00,6.00,-122.00,12.00,5.00,17.7,North Bay
+11,Mare Island,38.00,3.00,6.00,-122.00,16.00,0.00,15.5,North Bay
+12,Pinole Shoal,38.00,3.00,1.00,-122.00,18.00,7.00,8.8,North Bay
+13,N. of Pinole Point,38.00,1.00,7.00,-122.00,22.00,2.00,9.8,North Bay
+14,"""Echo"" Buoy",38.00,0.00,4.00,-122.00,24.00,3.00,13.1,North Bay
+15,Point San Pablo,37.00,58.00,4.00,-122.00,26.00,2.00,22.9,North Bay
+16,"""Charlie"" Buoy",37.00,55.00,0.00,-122.00,26.00,8.00,12.8,North Bay
+17,Raccoon Strait,37.00,52.00,7.00,-122.00,25.00,3.00,32,North Bay
+18,Point Blunt,37.00,50.00,8.00,-122.00,25.00,3.00,43,North Bay
+20,Blossom Rock,37.00,49.00,2.00,-122.00,23.00,6.00,18.2,North Bay
+21,Bay Bridge,37.00,47.00,3.00,-122.00,21.00,5.00,17.4,South Bay
+22,Potrero Point,37.00,45.00,9.00,-122.00,21.00,5.00,18,South Bay
+23,Hunter's Point,37.00,43.00,7.00,-122.00,20.00,2.00,20.1,South Bay
+24,Candlestick Point,37.00,41.00,9.00,-122.00,20.00,3.00,11,South Bay
+25,Oyster Point,37.00,40.00,2.00,-122.00,19.00,5.00,8.8,South Bay
+26,San Bruno Shoal,37.00,38.00,2.00,-122.00,18.00,8.00,9.8,South Bay
+27,San Francisco Airport,37.00,37.00,1.00,-122.00,17.00,5.00,13,South Bay
+28,N. of San Mateo Bridge,37.00,36.00,1.00,-122.00,16.00,2.00,16.2,South Bay
+29,S. of San Mateo Bridge,37.00,34.00,8.00,-122.00,14.00,7.00,14.6,South Bay
+29.5,Steinberger Slough,37.00,34.00,1.00,-122.00,13.00,1.00,14.6,South Bay
+30,Redwood Creek,37.00,33.00,3.00,-122.00,11.00,4.00,12.8,South Bay
+31,Coyote Hills,37.00,31.00,7.00,-122.00,9.00,5.00,13.7,South Bay
+32,Ravenswood Point,37.00,31.00,1.00,-122.00,8.00,0.00,12.8,South Bay
+33,Dumbarton Bridge,37.00,30.00,5.00,-122.00,7.00,3.00,11.6,South Bay
+34,Newark Slough,37.00,29.00,7.00,-122.00,5.00,9.00,7.9,South Bay
+35,Mowry Slough,37.00,28.00,8.00,-122.00,4.00,7.00,8.5,South Bay
+36,Calaveras Point,37.00,28.00,3.00,-122.00,4.00,0.00,7.9,South Bay

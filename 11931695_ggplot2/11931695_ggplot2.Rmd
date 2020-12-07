@@ -1,0 +1,425 @@
+---
+title: "StatComp_11931695"
+subtitle: "for Exercises"
+author: "Eszter Katalin Bognar"
+date: "19-05-2020"
+output: pdf_document
+---
+
+# Introduction to Data Visualization with ggplot2
+## mapping onto a color gradient or onto a continuous size scale or shape (only for categorial variables)
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+library(ggplot2)
+ggplot(mtcars, aes(x = wt, y = mpg, color = disp)) + geom_point()
+ggplot(mtcars, aes(x = wt, y = mpg, size = disp)) + geom_point()
+```
+## Adding geometries
+Common geom layer functions:
+-geom_point() adds points (as in a scatter plot)
+-geom_smooth() adds a smooth trend curve
+We can also make change to individual geoms, such as making the points 40% opaque
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(diamonds, aes(x = carat, y = price, color = clarity)) +
+  geom_point(alpha=0.4) +
+  geom_smooth()
+```
+## Make changes to individual geoms and saving plots as variables
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+plt_price_vs_carat <- ggplot(diamonds, aes(carat, price))
+
+# Edit this to map color to clarity,
+# Assign the updated plot to a new object
+plt_price_vs_carat_by_clarity <- plt_price_vs_carat + geom_point(alpha = 0.2) + geom_smooth(aes(col = clarity), se = F)
+
+# See the plot
+plt_price_vs_carat_by_clarity
+```
+## Visible aesthetics -  color, fill, shape and size
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+# Map cyl to fill and 
+ggplot(mtcars, aes(x = wt, y = mpg, fill=gear, color = factor(cyl))) +
+  geom_point(shape = 21, size = 4)
+
+```
+## Using geom_text
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+plt_mpg_vs_wt <- ggplot(mtcars, aes(wt, mpg))
+
+# Use text layer and map fcyl to label
+plt_mpg_vs_wt +
+  geom_text(aes(label = cyl))
+```
+## Updating aesthetic labels
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(cyl, fill = as.factor(am))) +
+  geom_bar() +
+  # Set the axis labels
+  labs(x = "Number of Cylinders", y = "Count")
+
+```
+## Using custom color scale
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+palette <- c(automatic = "#377EB8", manual = "#E41A1C")
+
+# Set the position
+ggplot(mtcars, aes(factor(cyl), fill = factor(am))) +
+  geom_bar(position = "dodge") +
+  labs(x = "Number of Cylinders", y = "Count")
+  scale_fill_manual("Transmission", values = palette)
+```
+## Setting a dummy aesthetic
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(mpg, 0)) +
+  geom_jitter() +
+  # Set the y-axis limits
+  ylim(limits = c(-2,2))
+
+```
+## Scatter plots
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+# Plot price vs. carat, colored by clarity
+plt_price_vs_carat_by_clarity <- ggplot(diamonds, aes(carat, price, color = clarity))
+
+# Set transparency to 0.5
+plt_price_vs_carat_by_clarity + geom_point(alpha = 0.5, shape = 16)
+
+```
+## Aligned values
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+# Plot base
+plt_mpg_vs_fcyl_by_fam <- ggplot(mtcars, aes(factor(cyl), mpg, color = factor(am)))
+
+# Default points are shown for comparison
+plt_mpg_vs_fcyl_by_fam + geom_point()
+
+# Now jitter and dodge the point positions
+plt_mpg_vs_fcyl_by_fam + geom_point(position = position_jitterdodge(jitter.width = 0.3, dodge.width = 0.3))
+
+```
+## Applying jittering and alpha blending as solution to the overplotting
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+library(car)
+ggplot(Vocab, aes(education, vocabulary)) +
+  # Set the shape to 1
+  geom_jitter(alpha = 0.2, shape=1)
+```
+## Histograms
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+datacamp_light_blue <- "#51A8C9"
+
+ggplot(mtcars, aes(mpg, ..density..)) +
+  # Set the fill color to datacamp_light_blue
+  geom_histogram(binwidth = 1, fill=datacamp_light_blue)
+
+```
+## Putting bars on top of eachother
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(mpg, fill = factor(am))) +
+  # Change the position to identity, with transparency 0.4
+  geom_histogram(binwidth = 1, position = "identity", alpha=0.4)
+```
+## Bar plots
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(factor(cyl), fill = factor(am))) +
+  # Change the position to "dodge"
+  geom_bar(position = "dodge")
+
+```
+## Overlapping bar plots
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(cyl, fill = factor(am))) +
+  # Set the transparency to 0.6
+  geom_bar(position = position_dodge(width = 0.2),alpha=0.6)
+
+```
+## Line plots
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+# Change the y-axis to the proportion of the population that is unemployed
+ggplot(economics, aes(date,unemploy/pop)) +
+  geom_line()
+```
+## Themes layer
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+# Position the legend inside the plot at (0.6, 0.1)
+p=ggplot(ChickWeight, 
+    aes(x = Time, y = weight, col = Diet)) + 
+  geom_line(
+    aes(group = Chick), alpha = 0.3) +
+  theme(legend.position = "left")
+```
+## Modifying theme elements
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+p +
+  theme(
+    rect = element_rect(fill = "grey92"),
+    legend.key = element_rect(color = NA),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    panel.grid.major.y = element_line(
+      color = "white",
+      size = 0.5,
+      linetype = "dotted"
+    ),
+    # Set the axis text color to grey25
+    axis.text = element_text(color = "grey25"),
+    # Set the plot title font face to italic and font size to 16
+   plot.title=element_text(size=16, face="italic")
+  )
+```
+## Modifying whitespace
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+
+p +
+  theme(
+    # Set the axis tick length to 2 lines
+    axis.ticks.length = unit(2,"lines")
+  )
+```
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+
+p +
+  theme(
+    # Set the plot margin to (10, 30, 50, 70) millimeters
+    plot.margin = margin(10, 30, 50, 70, "mm")
+  )
+```
+## Built-in themes
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+# Add a void theme
+p +
+  theme_void()
+# Add a classic theme
+p +
+  theme_classic()
+# Add a bw theme
+p +
+  theme_bw()
+
+```
+# Intermediate Data Visualitatiton with ggplot2 
+## Statistics
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, 
+    aes(x = wt, y = mpg, color = factor(cyl))) +
+  # Add a point layer
+  geom_point() +
+  # Add a smooth lin reg stat, no ribbon
+  stat_smooth(method="lm",se=FALSE)
+
+```
+## Amend the plot
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+# Amend the plot
+ggplot(mtcars, aes(x = wt, y = mpg, color = factor(cyl))) +
+  geom_point() +
+  # Map color to dummy variable "All"
+  stat_smooth(se = FALSE,aes(color="All")) +
+  stat_smooth(method = "lm", se = FALSE)
+```
+## Quantile
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(Vocab, aes(x = education, y = vocabulary)) +
+  geom_jitter(alpha = 0.25) +
+  stat_quantile(quantiles = c(0.05, 0.5, 0.95))
+```
+## Sum
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(Vocab, aes(x = education, y = vocabulary, group = education)) +
+  stat_sum(aes(size = ..prop..))
+```
+## Using stats outside geoms
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+posn_j <- position_jitter(width = 0.2)
+posn_d <- position_dodge(width = 0.1)
+posn_jd <- position_jitterdodge(jitter.width = 0.2, dodge.width = 0.1)
+
+# Create the plot base: wt vs. fcyl, colored by fam
+p_wt_vs_fcyl_by_fam_jit <- ggplot(mtcars,aes(factor(cyl),wt,color=factor(am)))
+
+# Add a point layer
+p_wt_vs_fcyl_by_fam_jit +
+  geom_point()
+```
+## Using the stat_summary function
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+p_wt_vs_fcyl_by_fam_jit +
+  # Add a summary stat of std deviation limits
+  stat_summary(fun.data = mean_sdl,
+  fun.args = list(mult = 1),
+  position = posn_d)
+
+```
+## Coordinates layer
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(x = wt, y = hp, color = factor(am))) +
+  geom_point() +
+  geom_smooth() +
+  # Add Cartesian coordinates with x limits from 3 to 6
+  coord_cartesian(xlim = c(3,6))
+```
+## Setting aspect ratio
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(iris, aes(x = Sepal.Length, y = Sepal.Width, color = Species)) +
+  geom_jitter() +
+  geom_smooth(method = "lm", se = FALSE) +
+  # Fix the coordinate ratio
+  coord_equal()
+```
+## Expand and clip
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point(size = 2) +
+  # Turn clipping off
+  coord_cartesian(expand = 0, clip="off") +
+  theme_classic() +
+  # Remove axis lines
+  theme(axis.line=element_blank())
+```
+## Log-transforming scales
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+# Perform a log10 coordinate system transformation
+ggplot(msleep, aes(bodywt, brainwt)) +
+  geom_point() +
+  coord_trans(x="log10",y="log10")
+```
+# Log-transforming scales
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+# Plot with a scale_*_*() function:
+ggplot(msleep, aes(bodywt, brainwt)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  # Add a log10 x scale
+  scale_x_log10() +
+  scale_y_log10() +
+  ggtitle("Scale functions")
+```
+## Flipped axes
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(factor(cyl), fill = factor(am))) +
+  # Set a dodge width of 0.5 for partially overlapping bars
+  geom_bar(position = "dodge") +
+  coord_flip()
+```
+## Pie chart - Polar coordinates
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(x = 1, fill = factor(cyl))) +
+  geom_bar() +
+  # Add a polar coordinate system
+  coord_polar()
+```
+# Make some adjustment
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(x = 1, fill = factor(cyl))) +
+  # Reduce the bar width to 0.1
+  geom_bar(width=0.1) +
+  coord_polar(theta = "y") +
+  # Add a continuous x scale from 0.5 to 1.5
+  scale_x_continuous(limits=c(0.5,1.5))
+```
+## The facets layer
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(wt, mpg)) + 
+  geom_point() +
+  # Facet rows by am and columns by cyl
+   facet_grid(rows=vars(am),cols=vars(cyl))
+```
+## Facet formula formulation
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(wt, mpg)) + 
+  geom_point() +
+  # Facet rows by am using formula notation
+  facet_grid(am ~ .) 
+
+ggplot(mtcars, aes(wt, mpg)) + 
+  geom_point() +
+  # Facet columns by cyl using formula notation
+  facet_grid(. ~ cyl)
+  
+ggplot(mtcars, aes(wt, mpg)) + 
+  geom_point() +
+  # Facet rows by am and columns by cyl using formula notation
+  facet_grid(am ~ cyl)
+```
+## Labeling facets
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  # Two variables
+  facet_grid(cols = vars(vs, cyl), labeller = label_context)
+```
+## Labeling facets
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+# Make factor, set proper labels explictly, and
+# manually set the label order
+mtcars$fam <- factor(mtcars$am,
+                     levels = c(1, 0),
+                     labels = c("manual", "automatic"))
+
+# View again
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  facet_grid(cols = vars(fam))
+```
+## Scaling and spacing
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(x = mpg, y = factor(cyl), color = factor(am))) +
+  geom_point() +
+  # Free the y scales and space
+  facet_grid(rows = vars(gear),space="free_y",scales="free_y")
+```
+##Facet wrapping for many levels
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(Vocab, aes(x = education, y = vocabulary)) +
+  stat_smooth(method = "lm", se = FALSE) +
+  # Create facets, wrapping by year, using vars()
+  facet_wrap(vars(year))
+```
+## Margin plots
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+ggplot(mtcars, aes(x = wt, y = mpg)) + 
+  geom_point() +
+  # Update the facets to only show margins on gear and fvs
+  facet_grid(rows = vars(factor(vs), factor(am)), cols = vars(gear), margins = c("gear","fvs"))
+```
+## Best practices - Bar plots: dynamite plots
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+# Define a dodge position object with width 0.9
+posn_d <- position_dodge(width = 0.9)
+
+# For each summary stat, update the position to posn_d
+ggplot(mtcars, aes(x = factor(cyl), y = wt, color = factor(am), fill = factor(am))) +
+  stat_summary(fun.y = mean, geom = "bar", position = posn_d, alpha = 0.5) +
+  stat_summary(fun.data = mean_sdl, fun.args = list(mult = 1), width = 0.1, position = posn_d, geom = "errorbar")
+```
+## Heatmaps
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+library(lattice)
+ggplot(barley,aes(year,variety,fill=yield)) +
+  # Add a tile geom
+  geom_tile()
+```
+##Heatmap alternatives
+
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+# Using barley, plot yield vs. year, colored and grouped by variety
+ggplot(barley,aes(year,yield,group=variety,color=variety)) +
+  # Add a line layer
+  geom_line() +
+  # Facet, wrapping by site, with 1 row
+  facet_wrap( ~ site, nrow = 1)
+```
+</div></pre>

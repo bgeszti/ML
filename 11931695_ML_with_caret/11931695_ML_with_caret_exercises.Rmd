@@ -1,0 +1,275 @@
+---
+title: "Predictive Modeling with the caret Package"
+subtitle: "for Exercises"
+author: "Eszter Katalin Bognar"
+date: "02-06-2020"
+output: pdf_document
+---
+
+# Exercises
+
+## Load the dataset, split into train and test set
+
+```{r, echo=T}
+# use the caret package
+library(caret)
+
+# load the used segmentationData dataset
+data(segmentationData)
+
+# get rid of the cell identifier
+?segmentationData$Cell <- NULL
+
+#split the dataset into training and test set using the value of the Case column (Train or Test)
+training <- subset(segmentationData, Case == "Train")
+testing <- subset(segmentationData, Case == "Test")
+
+# get rid of the Case column
+training$Case <- NULL
+testing$Case <- NULL
+
+# check the first 6 columns in the training dataset
+str(training[,1:6])
+```
+
+## Preprocess the dataset
+
+```{r, echo=T}
+# Since channel 1 is the cell body, AreaCh1 measures the size of the cell.
+# First, estimate the standardization parameters:
+# take the dataset without the Class column as trainX
+trainX <- training[, names(training) != "Class"]
+# Methods are "BoxCox", "YeoJohnson", center", "scale",
+# "range", "knnImpute", "bagImpute", "pca", "ica" and
+# "spatialSign"
+# preprocess the training set with standardization (centring and scaling)
+preProcValues <- preProcess(trainX, method = c("center", "scale"))
+preProcValues
+# Apply them to the data sets:
+scaledTrain <- predict(preProcValues, trainX)
+```
+
+# CART: Classification and regression trees
+
+## create and visualize the model
+
+```{r, echo=T}
+library(rpart)
+# applying an rpart model on the training set with maximum 2 depth 
+rpart1 <- rpart(Class ~ ., data = training,
+control = rpart.control(maxdepth = 2))
+rpart1
+```
+
+```{r, echo=T, fig.width=8, fig.height=6}
+# plot rpart the model
+plot(rpart1)
+# display the model in text format
+text(rpart1)
+```
+
+
+```{r, echo=T, fig.width=8, fig.height=6}
+# load the partykis library
+library(partykit)
+# use the partykit library to visualize the tree structured regression or classification model
+rpart1a <- as.party(rpart1)
+# plot the model - we can see the partykit package gives us a more detailed model visualization than rpart
+plot(rpart1a)
+```
+
+```{r, echo=T}
+# Full tree without any control parameter:
+rpartFull <- rpart(Class ~ ., data = training)
+# display the model in text format
+rpartFull
+```
+```{r, echo=T, fig.width=14, fig.height=6}
+# Plot the Full tree
+plot(as.party(rpartFull))
+```
+
+## Apply the model and evaluate model performance
+
+```{r, echo=T}
+# make prediction on the testing set
+rpartPred <- predict(rpartFull, testing, type = "class")
+# display the confusion matrix to evaluate model performance
+confusionMatrix(rpartPred, testing$Class) # requires 2 factor vectors
+```
+
+## Tuning the model
+
+```{r, echo=T}
+# apply 10 fold cross-validation with 3 repeats
+# for the rpart model we tune the C(p) complexity parameter
+cvCtrl <- trainControl(method = "repeatedcv", repeats = 3,
+summaryFunction = twoClassSummary,
+classProbs = TRUE)
+set.seed(1)
+# tune the rpart model with 30 grid points using the ROC metric for evaluation criterion for optimal model selection
+rpartTune <- train(Class ~ ., data = training, method = "rpart",
+tuneLength = 30, metric = "ROC",
+trControl = cvCtrl)
+rpartTune
+```
+
+```{r, echo=T, fig.width=8, fig.height=6}
+# plot the ROC curve with the defined scales
+plot(rpartTune, scales = list(x = list(log = 10)))
+```
+
+## ## Apply the model and evaluate model performance aftertuning
+
+```{r, echo=T}
+# predict new data
+rpartPred2 <- predict(rpartTune, testing)
+# display the confusion matrix 
+confusionMatrix(rpartPred2, testing$Class)
+```
+
+
+```{r, echo=T}
+# Predict class probabilities
+rpartProbs <- predict(rpartTune, testing, type = "prob")
+head(rpartProbs)
+```
+
+
+```{r, echo=T, fig.width=6, fig.height=4}
+# load the pROC package
+library(pROC)
+# creating the ROC curve
+rpartROC <- roc(testing$Class, rpartProbs[, "PS"], levels = levels(testing$Class))
+# plot the ROC curve
+# Setting direction: controls > cases
+plot(rpartROC, type = "S", print.thres = .5)
+
+```
+```{r, echo=T, fig.width=8, fig.height=6}
+# examine the created ROC object
+rpartROC
+```
+
+# SVM
+
+## split data, preprocess it and tune the svm model
+
+```{r, echo=T}
+set.seed(1)
+# The default grid of cost parameters go from 2^-2,
+# 0.5 to 1,
+# Well fit 9 values in that sequence via the tuneLength
+# argument.
+svmTune <- train(x = trainX,
+y = training$Class,
+method = "svmRadial",
+tuneLength = 9,
+# add options from preProcess here too
+preProc = c("center", "scale"),
+metric = "ROC",
+trControl = cvCtrl)
+# display the tuning process
+svmTune
+```
+
+
+```{r, echo=T,fig.width=8, fig.height=6}
+# display the final model
+svmTune$finalModel
+```
+
+
+```{r, echo=T,fig.width=8, fig.height=6}
+# plot the model
+plot(svmTune, metric = "ROC", scales = list(x = list(log=2)))
+```
+
+## Evaluate model performance
+
+```{r, echo=T}
+# Make predictions on the test set:
+svmPred <- predict(svmTune, testing[, names(testing) != "Class"])
+# display the conusion matrix
+confusionMatrix(svmPred, testing$Class)
+```
+
+# Random Forests
+
+## preprocessing and model tuning
+
+```{r, echo=T}
+set.seed(1)
+# set tuning and preprocessing
+rfTune <- train(x = trainX,
+y = training$Class,
+method = "rf",
+preProc = c("center", "scale"),
+metric = "ROC",
+trControl = cvCtrl)
+# display the tuning process
+rfTune
+```
+
+```{r, ech=T}
+# display the final model
+rfTune$finalModel
+```
+
+```{r,echo=T,fig.width=8, fig.height=6}
+# plot the model
+plot(rfTune, metric = "ROC", scales = list(x = list(log=2)))
+```
+
+## Evaluate model performance
+
+```{r, echo=T}
+# make preditions on the test set
+rfPred <- predict(rfTune, testing[, names(testing) != "Class"])
+# display the confusion matrix
+confusionMatrix(rfPred, testing$Class)
+
+```
+
+# Collecting results with resamples
+
+```{r, echo=T}
+# collect resamples from the tuned rpart, svm and rf models
+cvValues <- resamples(list(CART = rpartTune, SVM = svmTune, rf = rfTune))
+# display the summary statistics of the values
+summary(cvValues)
+```
+
+```{r, echo=T,fig.width=8, fig.height=6}
+# Visualize resamples with splom
+splom(cvValues, metric = "ROC")
+```
+
+```{r, echo=T,fig.width=8, fig.height=6}
+# Visualize resamples with xyplot
+xyplot(cvValues, metric = "ROC")
+```
+
+```{r, echo=T,fig.width=8, fig.height=6}
+# Visualize resamples with paralellplot
+parallelplot(cvValues, metric = "ROC")
+```
+
+```{r, echo=T,fig.width=8, fig.height=6}
+# Visualize resamples with dotplot
+dotplot(cvValues, metric = "ROC")
+```
+
+## Comparing models
+
+```{r, echo=T}
+# Comparing models
+rocDiffs <- diff(cvValues, metric = "ROC")
+# display comparison
+summary(rocDiffs)
+```
+```{r, echo=T,fig.width=8, fig.height=6}
+# Visualizing differences
+dotplot(rocDiffs, metric = "ROC")
+```
+</div></pre>

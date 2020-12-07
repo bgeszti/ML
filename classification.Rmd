@@ -1,0 +1,132 @@
+---
+title: "Exercise 6"
+subtitle: "for Advanced Methods for Regression and Classification"
+author: "Eszter Katalin Bognar"
+date: "18.11.2020"
+output: pdf_document
+---
+
+To prevent cutting the pdf
+```{r, echo = TRUE}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+# Olitos dataset
+
+Load and view the data
+```{r, echo=TRUE}
+data(olitos,package="rrcov")
+str(olitos)
+```
+
+Performing principal component analysis for the 25 x-variables
+```{r, echo=TRUE}
+olitos.pca <- prcomp(olitos[,c(1:25)], center = TRUE,scale. = TRUE)
+summary(olitos.pca)
+str(olitos.pca)
+```
+
+Show a plot of the first 2 PCA scores, with color information for the 4 groups
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+olitosClasses <- factor(olitos$grp)
+plot(olitos.pca$x[,1:2], col = olitosClasses)
+```
+
+Based on the plot, we can see that using two components it hard to find a clear decision boundary between the 4 classes.
+
+Train/test split
+```{r, echo=TRUE}
+set.seed(123)
+smp_size <- floor(2/3* nrow(olitos))
+train_ind <- sample(seq_len(nrow(olitos)), size = smp_size)
+```
+
+Apply LS
+```{r, echo=TRUE}
+alias(as.numeric(grp)~.,data=olitos)
+model.ls <- lm(as.numeric(grp)~.,data=olitos,subset=train_ind)
+summary(model.ls)
+```
+
+By looking at the model summary we can see, that only the intercept and a few variables are contributing significantly to the model, X2 has the highest significance and X13 and X23 some lower significance.
+
+Make predictions, Binary response matrix (confusion matrix)
+```{r, echo=TRUE}
+library(caret)
+pred <- predict(model.ls,olitos[train_ind,])
+predfact = cut(pred, 4, labels=c('1', '2', '3','4'))
+confusionMatrix(olitos$grp[train_ind],predfact)
+```
+
+Evaluation on the test set
+```{r, echo=TRUE}
+library(caret)
+pred <- predict(model.ls,olitos[-train_ind,])
+predfact = cut(pred, 4, labels=c('1', '2', '3','4'))
+confusionMatrix(olitos$grp[-train_ind],predfact)
+```
+The model cannot distinguish between the classes, specially on the test set. There are misclassifications occurring mostly for groups 2,3,4, group 1 is identified better. This corresponds with the first plot, where the "green" class has a clearer decision boundary.
+
+# Bank + Marketing dataset
+
+Load the data
+```{r, echo=TRUE}
+# bank data set:
+d <- read.csv2("bank.csv")
+table(d$y)
+```
+
+Select randomly a training set with 3000 observations
+```{r, echo=TRUE}
+n <- nrow(d)
+set.seed(123)
+train <- sample(1:n,3000)
+test <- c(1:n)[-train]
+```
+
+use lm() to predict the group label
+```{r, echo=TRUE}
+model.lm <- lm(as.numeric(y)~.,data=d,subset=train)
+pred <- predict(model.lm,d[test,])
+library(caret)
+predfact = cut(pred, 2, labels=c('no', 'yes'))
+confusionMatrix(d$y[test],predfact)
+```
+
+Apply undersampling
+```{r, echo=TRUE}
+table(d$y[train])
+train.yes <- train[d$y[train]=="yes"]
+train.no <- sample(train[d$y[train]=="no"],length(train.yes))
+model.lm_undersampling <- lm(as.numeric(y)~.,data=d,subset=c(train.yes,train.no))
+pred_undersampling <- predict(model.lm_undersampling,d[test,])
+```
+
+Evaluate the results
+```{r, echo=TRUE}
+library(caret)
+predfact = cut(pred_undersampling, 2, labels=c('no', 'yes'))
+confusionMatrix(d$y[test],predfact)
+```
+
+The accuracy increased and the misclassification error decreased.
+
+Apply oversampling
+```{r, echo=TRUE}
+table(d$y[train])
+train.no <- train[d$y[train]=="no"]
+train.yes <- sample(train[d$y[train]=="yes"],length(train.no),
+                    replace=TRUE)
+model.lm_oversampling <- lm(as.numeric(y)~.,data=d,subset=c(train.yes,train.no))
+pred_oversampling <- predict(model.lm_oversampling,d[test,])
+```
+
+Evaluate the results
+```{r, echo=TRUE}
+library(caret)
+predfact = cut(pred_oversampling, 2, labels=c('no', 'yes'))
+confusionMatrix(d$y[test],predfact)
+```
+
+With oversampling, the results are worse.

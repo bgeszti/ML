@@ -1,0 +1,243 @@
+---
+title: "Exercise 2"
+subtitle: "for Advanced Methods for Regression and Classification"
+author: "Eszter Katalin Bognar"
+date: "21.10.2020"
+output: pdf_document
+---
+
+To prevent cutting the pdf
+```{r}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+# Data preparation
+
+Load and view the data
+```{r, echo=TRUE}
+load("dat.RData")
+#head(d)
+```
+
+Select the required subset of attributes
+```{r, echo=TRUE}
+library(tidyverse)
+ds <- d %>% select(y,X20:X65)
+#head(ds)
+```
+
+Create train/test set
+```{r, echo=TRUE}
+set.seed(123)
+smp_size <- floor(0.67* nrow(ds))
+train_ind <- sample(seq_len(nrow(ds)), size = smp_size)
+#train <- ds[train_ind, ]
+#test <- ds[-train_ind, ]
+```
+
+Explore dataset dimensions
+```{r, echo=TRUE}
+dim(ds[train_ind, ])
+dim(ds[-train_ind, ])
+```
+
+# Data modeling
+
+## Full model
+
+Estimate the full regression model and inspect the summary table
+```{r, echo=TRUE}
+model.full <- lm(y ~ ., data=ds[train_ind, ])
+summary(model.full)
+```
+NA as a coefficient in a regression indicates that the variable in question is linearly related to the other variables. Here X61 is a linearly dependent attribute.
+
+Find aliases (linearly dependent terms) in a linear model
+```{r, echo=TRUE}
+alias(model.full)
+```
+
+We can see that X61 is correlated with X22. Some of the attributes should be removed from the model. 
+
+Remove X61
+```{r, echo=TRUE}
+ds = select(ds, -X61)
+```
+
+Estimate the full regression model again 
+```{r, echo=TRUE}
+model.full <- lm(y ~ ., ds[train_ind,])
+summary(model.full)
+```
+We can see that we have some small intercept in the model. X36, X48, X63 and X64 variables are having the highest significance scores so they are the most important in explaining the y variable. The X22, X33, X34, X35, X37, X39, X49, X50, X56, X57, X58 variables also contribute to the final model but with less significance. The other variables are not significantly relevant in the model.
+
+Define MSE function
+```{r, echo=TRUE}
+MSE<- function(model,data){
+mean((data$y - predict.lm(model, data)) ^ 2)
+}
+```
+
+Compute MSE for training and test data
+```{r, echo=TRUE}
+#mse train and test using lm
+mse_train=MSE(model.full,data=ds[train_ind,])
+mse_test=MSE(model.full,data=ds[-train_ind,])
+
+#save results in a df
+df_lm <- data.frame(model='model.full',mse_train = mse_train, mse_test = mse_test)
+df_lm
+```
+We got better fit, less MSE on the training set. We can also see this on the y_hat - y plots of the train and test sets. 
+
+Plot y versus ˆy for training and test data
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+plot(ds[train_ind,]$y, predict(model.full, ds[train_ind,]))
+title(main = "Train set predictions for the full model")
+abline(c(0,1))
+
+plot(ds[-train_ind,]$y, predict(model.full, ds[-train_ind,]))
+title(main = "Test predictions for the full model")
+abline(c(0,1))
+```
+
+## Stepwise regression
+```{r, results = FALSE}
+
+#forward method
+model.empty <- lm(y~1,ds[train_ind,])
+model.step.forward <- step(model.empty,scope=formula(model.full),subset=train_ind)
+summary(model.step.forward)
+
+#backward method
+
+model.step.backward <- step(model.full,subset=train_ind)
+summary(model.step.backward)
+
+#both direction method
+model.step.both <- step(model.full, subset=train_ind, direction='both')
+summary(model.step.both)
+
+```
+
+Calculate and compare MSE
+```{r, echo=TRUE}
+df_stepwise_lm <- data.frame()
+mse_empty_train <- MSE(model.empty,ds[train_ind,])
+mse_empty_test <-MSE(model.empty,ds[-train_ind,])
+df_empty <- data.frame(model='model.empty',mse_train = mse_empty_train, mse_test = mse_empty_test)
+df_stepwise_lm <- rbind(df_stepwise_lm,df_empty)
+
+mse_full_train <- MSE(model.full,ds[train_ind,])
+mse_full_test <- MSE(model.full,ds[-train_ind,])
+df_full <- data.frame(model='model.full',mse_train = mse_full_train, mse_test = mse_full_test)
+df_stepwise_lm <-rbind(df_stepwise_lm,df_full)
+
+mse_stepf_train <- MSE(model.step.forward,ds[train_ind,])
+mse_stepf_test <-MSE(model.step.forward,ds[-train_ind,])
+df_stepf <- data.frame(model='model.step.forward',mse_train = mse_stepf_train, mse_test = mse_stepf_test)
+df_stepwise_lm <-rbind(df_stepwise_lm,df_stepf)
+
+
+mse_stepb_train <-MSE(model.step.backward,ds[train_ind,])
+mse_stepb_test <-MSE(model.step.backward,ds[-train_ind,])
+df_stepb <- data.frame(model='model.step.back',mse_train = mse_stepb_train, mse_test = mse_stepb_test)
+df_stepwise_lm <-rbind(df_stepwise_lm,df_stepb)
+
+mse_both_train <-MSE(model.step.both,ds[train_ind,])
+mse_both_test <-MSE(model.step.both,ds[-train_ind,])
+df_stepboth <- data.frame(model='model.step.both',mse_train = mse_both_train, mse_test = mse_both_test)
+df_stepwise_lm <-rbind(df_stepwise_lm,df_stepboth)
+
+df_stepwise_lm
+```
+
+We can see that the full model is the best on the training set, the stepwise regression with forward and backward direction gives similar results on the training set. Forward selection is better on the test set and backward selection is  better on the training set. Both selection methods gives significant prediction performance comparing to the empty model. Selection in both direction gives the best model as result on the used set (training set), thus the MSE using this selection is the same as the result of the backward selection. 
+
+Plot y versus ˆy for training and test data
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+plot(ds[train_ind,]$y, predict(model.step.forward, ds[train_ind,]))
+title(main = "Train set predictions for the forward model")
+abline(c(0,1))
+
+plot(ds[-train_ind,]$y, predict(model.step.forward, ds[-train_ind,]))
+title(main = "Test predictions for the forward model")
+abline(c(0,1))
+
+plot(ds[train_ind,]$y, predict(model.step.backward, ds[train_ind,]))
+title(main = "Train set predictions for the backward model")
+abline(c(0,1))
+
+plot(ds[-train_ind,]$y, predict(model.step.backward, ds[-train_ind,]))
+title(main = "Test predictions for the backward model")
+abline(c(0,1))
+```
+
+Compare models using ANOVA
+```{r, echo=TRUE}
+anova(model.step.forward,model.step.backward)
+```
+
+Based on the ANOVa test, we have to reject the hipothesis of keeping the forward model and use the backward model instead. 
+
+## Best subset regression
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+library(leaps)
+lm.regsubset <- regsubsets(y~. ,data=ds, nbest=3, nvmax=10, really.big=T, subset=train_ind)
+plot(lm.regsubset)
+```
+The optimal model can be chosen from the models with “saturated” grey, and preferably that model is taken with the smallest number of variables. This plot is hard to read so we check plot of the BIC values and subset sizes.
+
+Checking the BIC values (+adj_R^2 and Cp)
+```{r, echo=TRUE,fig.width=6,fig.height=4}
+results <- summary(lm.regsubset)
+# extract and plot results
+tibble(predictors = 1:10,
+       adj_R2 = results$adjr2[seq(1, length(results$adjr2), 3)],
+       Cp = results$cp[seq(1, length(results$cp), 3)],
+       BIC = results$bic[seq(1, length(results$bic), 3)]) %>%
+  gather(statistic, value, -predictors) %>%
+  ggplot(aes(predictors, value, color = statistic)) +
+  geom_line(show.legend = F) +
+  geom_point(show.legend = F) +
+  facet_wrap(~ statistic, scales = "free")
+```
+The model with 10 attributes seems to be the best.
+
+Checking the best model 
+```{r, echo=TRUE}
+#number of attributes
+which.min(results$bic[seq(1, length(results$bic), 3)])
+which.max(results$adjr2[seq(1, length(results$adjr2), 3)])
+which.min(results$cp[seq(1, length(results$cp), 3)])
+
+#attribute names
+coef(lm.regsubset, 30)
+
+#model summary
+model.best <- lm(y~X29+X32+X34+X36+X46+X48+X52+X58+X63+X64,data=ds,subset=train_ind)
+summary(model.best)
+```
+
+Calculate MSE for the best model 
+```{r,echo=TRUE}
+#calculate MSE
+mse_best_train <- MSE(model.best,ds[train_ind,])
+mse_best_test <-MSE(model.empty,ds[-train_ind,])
+df_best <- data.frame(model='model.best',mse_train = mse_best_train, mse_test = mse_best_test)
+df_best
+```
+
+Plot the predictions
+```{r, echo=TRUE,fig.width=6,fig.height=3}
+plot(ds[train_ind,]$y, predict(model.best, ds[train_ind,]))
+title(main = "Train set predictions for the best model")
+abline(c(0,1))
+
+plot(ds[-train_ind,]$y, predict(model.best, ds[-train_ind,]))
+title(main = "Test predictions for the best model")
+abline(c(0,1))
+```
+The best model has 10 variables, the MSE on the training set is 0.4095201, on the test set 0.9458294 (worse than the full model). Checking the model summary we can see that all attributes are significant and contributes in the prediction of y.
+</div></pre>

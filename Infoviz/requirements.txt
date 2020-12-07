@@ -1,0 +1,7 @@
+plotly_express
+dash
+pandas
+plotly
+gunicorn
+flask_caching
+redis

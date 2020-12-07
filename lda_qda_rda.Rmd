@@ -1,0 +1,136 @@
+---
+title: "Exercise 7"
+subtitle: "for Advanced Methods for Regression and Classification"
+author: "Eszter Katalin Bognar"
+date: "11/25/2020"
+output: pdf_document
+---
+
+To prevent cutting the pdf
+```{r, echo = TRUE}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+# Olitos dataset
+
+Load and view the data
+```{r, echo=TRUE}
+data(olitos,package="rrcov")
+str(olitos)
+```
+
+Train/test split
+```{r, echo=TRUE}
+set.seed(123)
+n <- nrow(olitos)
+train_idx <- sample(1:n, round(n*2/3))
+test_idx <- c(1:n)[-train_idx]
+```
+
+
+## LDA
+```{r, echo=TRUE}
+library(MASS)
+
+#test set error using LDA
+res_lda <- lda(grp~.,data=olitos,subset=train_idx)
+pred_lda <- predict(res_lda,olitos[test_idx,])$class
+(TAB <- table(olitos$grp[test_idx],pred_lda))
+1- sum(diag(TAB))/sum(TAB)
+
+# CV error for training data using LDA
+res_cv_lda <- lda(grp~.,data=olitos,subset=train_idx, CV=TRUE)
+(TAB <- table(olitos$grp[train_idx],res_cv_lda$class))
+1- sum(diag(TAB))/sum(TAB)
+```
+
+The misclassification rate for the test set is smaller than using CV error but the results are reasonable at both case. The test set error highly depends on the random selection of test rows, the cv error gives a more generalized and accurate measurement of the misclassification rate by having different rows for testing. 
+
+## QDA
+
+By simply using qda, there is an error because of the too small group size,there is not enough data to fit a quadratic model...The test in MASS:::qda.default is if (any(counts < p + 1)) stop("some group is too small for 'qda'") where counts is the number of occurrences in each category and p is the number of columns in the predictor matrix ...
+Using PCA on the training set to solve the error, using 6 components we can have enough data in each group to fit a quadratic model.
+
+```{r, echo=TRUE}
+#prepare dataset, do pca
+X <- olitos[,-1]
+Xm <- data.matrix(X)
+pc <- princomp(Xm[train_idx,],cor=TRUE)
+
+#using only 6 components
+df <- data.frame(grp=olitos$grp[train_idx],pc$scores[,1:6])
+
+#prepare test data
+Xmtest <- scale(Xm[test_idx,],pc$center,pc$scale)
+Ztest <- Xmtest %*% pc$loadings
+dftest <- data.frame(grp=olitos$grp[test_idx],Ztest[,c(1:6)])
+
+# test error using QDA
+res_qda <- qda(grp~.,data=df)
+pred_qda <- predict(res_qda,dftest)$class
+(TAB <- table(olitos$grp[test_idx],pred_qda))
+1- sum(diag(TAB))/sum(TAB)
+
+# CV error for training data using QDA
+res_cv_qda <- qda(grp~.,data=df, CV=TRUE)
+(TAB <- table(olitos$grp[train_idx],res_cv_qda$class))
+1- sum(diag(TAB))/sum(TAB)
+```
+
+For QDA, the misclassification rates are quite the same and both very low, the test set error is a bit smaller.  
+
+## RDA
+```{r, echo=TRUE}
+library(klaR)
+
+#test set error using RDA
+res_rda <- rda(grp~.,data=olitos,subset=train_idx)
+res_rda$regularization
+pred_rda <- predict(res_rda,olitos[test_idx,])$class
+(TAB <- table(olitos$grp[test_idx],pred_rda))
+1- sum(diag(TAB))/sum(TAB)
+
+res_cv_rda <- rda(grp~.,data=olitos,subset=train_ind, CV=TRUE)
+res_cv_rda$regularization
+```
+
+The misclassification rate is very small. Gamma and lambda parameters can be shifted towards a diagonal matrix and/or the pooled covariance matrix. For (gamma=0, lambda=0) it equals QDA, for (gamma=0, lambda=1) it equals LDA. Both the lambda and gamma values are close to 0 so the model is more QDA.
+
+# Bank+Marketing dataset
+
+Load the data
+```{r, echo=TRUE}
+# bank data set:
+d <- read.csv2("bank.csv")
+table(d$y)
+```
+
+Select randomly a training set with 3000 observations
+```{r, echo=TRUE}
+n <- nrow(d)
+set.seed(123)
+train <- sample(1:n,3000)
+test <- c(1:n)[-train]
+```
+
+Use lda to predict the group label
+```{r, echo=TRUE}
+res_bank_lda <- lda(y~.,data=d,subset=train)
+pred_bank_lda <- predict(res_bank_lda,d[test,])$class
+TAB <- table(d$y[test],pred_bank_lda)
+TAB
+1- sum(diag(TAB))/sum(TAB)
+TAB[2,1]/sum(TAB[2,])
+```
+
+Set prior probabilities in order to obtain "balanced" classifier)
+```{r, echo=TRUE}
+res_bank_lda <- lda(y~.,data=d,subset=train,prior=c(0.5,0.5))
+pred_bank_lda <- predict(res_bank_lda,d[test,])$class
+TAB <- table(d$y[test],pred_bank_lda)
+TAB
+1- sum(diag(TAB))/sum(TAB)
+TAB[2,1]/sum(TAB[2,])
+```
+Due to unbalanced classes we got much higher misclassification rate for the yes group. Using a balanced classifier the misclassification rates can be equalized a bit.

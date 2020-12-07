@@ -1,0 +1,210 @@
+---
+title: "Exercise 8"
+subtitle: "for Advanced Methods for Regression and Classification"
+author: "Eszter Katalin Bognar"
+date: "12/02/2020"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+To prevent cutting the pdf
+```{r, echo = TRUE}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+# Olitos dataset
+
+Load and view the data
+```{r, echo=TRUE}
+data(olitos,package="rrcov")
+str(olitos)
+```
+
+# Task 1
+
+Select the required data from the olitos dataset
+```{r, echo=TRUE}
+library(tidyverse)
+#select independent variables
+olitos <- olitos %>% select(grp,X1:X6)
+#select rows where grp=1 or grp=3
+olitos <-subset(olitos,(grp=="1" | grp=="3"))
+#drop unused levels
+olitos$grp=droplevels(olitos)$grp
+str(olitos)
+```
+Train/test split
+```{r, echo=TRUE}
+set.seed(123)
+n <- nrow(olitos)
+train_idx <- sample(1:n, round(n*2/3))
+test_idx <- c(1:n)[-train_idx]
+```
+
+Apply logistic regression (binomial case)
+```{r, echo=TRUE}
+res_glm <- glm(grp~., data=olitos, subse=train_idx,family = 'binomial')
+summary(res_glm)
+```
+There are only two significant independent variables in the model (X3 and X6) for explaining grp.
+
+Confusion matrix and misclassification error
+```{r, echo=TRUE}
+plot(predict(res_glm, olitos[test_idx,]),col= as.numeric(olitos$grp[test_idx]))
+
+#test set error
+pred_glm <- predict(res_glm,olitos[test_idx,])
+#predict using 0 as threshold 
+(TAB <- table(olitos$grp[test_idx],pred_glm>0.5))
+1- sum(diag(TAB))/sum(TAB)
+```
+The misclassification rate is reasonably good.
+
+Using all variables
+```{r, echo=TRUE}
+data(olitos,package="rrcov")
+#select rows where grp=1 or grp=3
+olitos <-subset(olitos,(grp=="1" | grp=="3"))
+#drop unused levels
+olitos$grp=droplevels(olitos)$grp
+str(olitos)
+#train-test split
+set.seed(123)
+n <- nrow(olitos)
+train_idx <- sample(1:n, round(n*2/3))
+test_idx <- c(1:n)[-train_idx]
+#apply glm
+res_glm <- glm(grp~., data=olitos, subse=train_idx,family = 'binomial')
+summary(res_glm)
+```
+Algorithm did not converge, thus the algorithm can not provide reasonable predictions. This is because of singularity, more variables than observations, lower level hyperplane
+
+# Task 2
+
+Select the required data from the olitos dataset
+```{r, echo=TRUE}
+data(olitos,package="rrcov")
+library(tidyverse)
+#select independent variables
+olitos <- olitos %>% select(grp,X1:X6)
+str(olitos)
+#train-test split
+set.seed(123)
+n <- nrow(olitos)
+train_idx <- sample(1:n, round(n*2/3))
+test_idx <- c(1:n)[-train_idx]
+```
+
+Apply multigroup classification using vglm()
+```{r, echo=TRUE}
+library(VGAM)
+res_vglm <- vglm(grp~., data=olitos, subse=train_idx,family = 'multinomial')
+summary(res_vglm)
+```
+
+Confusion matrix and misclassification error
+```{r, echo=TRUE}
+#test set error
+pred_vglm <- predictvglm(res_vglm,olitos[test_idx,],type='response')
+pred_vglm=as.factor(apply(pred_vglm, 1, which.max)) 
+(TAB <- table(olitos$grp[test_idx],pred_vglm))
+1- sum(diag(TAB))/sum(TAB)
+```
+The misclassification rate is reasonably good again, the result is similar like before in the binomial prediction case.
+
+# Task 3
+
+Use complete data set with all 4 groups
+```{r, echo=TRUE,warning=FALSE}
+library(glmnet)
+data(olitos,package="rrcov")
+
+#train-test split
+set.seed(123)
+n <- nrow(olitos)
+train_idx <- sample(1:n, round(n*2/3))
+test_idx <- c(1:n)[-train_idx]
+train=olitos[train_idx,]
+test=olitos[test_idx,]
+
+X <- train[,-26]
+Xm <- data.matrix(X)
+y=as.vector(train$grp)
+res_glmnet <- cv.glmnet(Xm,y,family="multinomial")
+plot(res_glmnet)
+summary(res_glmnet)
+```
+
+The plot includes the cross-validation curve (red dotted line), and upper and lower standard deviation curves along the λ sequence (error bars). Two selected λ’s are indicated by the vertical dotted lines.
+
+We can view the selected λ’s and the corresponding coefficients
+```{r, echo=TRUE}
+res_glmnet$lambda.min
+```
+lambda.min is the value of λ that gives minimum mean cross-validated error. The other λ saved is lambda.1se, which gives the most regularized model such that error is within one standard error of the minimum. To use that, we only need to replace lambda.min with lambda.1se above.
+By looking at the coefs we can identify the variables which contributes in predicting the given groups.
+```{r, echo=TRUE}
+coef(res_glmnet, s = "lambda.1se")
+coef(res_glmnet, s = "lambda.min")
+```
+```{r, echo=TRUE}
+X_test <- test[,-26]
+Xm_test <- data.matrix(X_test)
+pred_glmnet <- predict(res_glmnet,Xm_test,s = "lambda.min")
+pred_glmnet=as.factor(apply(pred_glmnet, 1, which.max)) 
+(TAB <- table(olitos$grp[test_idx],pred_glmnet))
+1- sum(diag(TAB))/sum(TAB)
+```
+The misclassification rate is a bit higher but still not bad.
+
+# Task 4
+
+Load the data
+```{r, echo=TRUE}
+# bank data set:
+d <- read.csv2("bank.csv")
+table(d$y)
+```
+
+Train/test split
+```{r, echo=TRUE}
+n <- nrow(d)
+set.seed(123)
+train <- sample(1:n,3000)
+test <- c(1:n)[-train]
+```
+
+Apply glm()
+```{r, echo=TRUE}
+res <- glm(y~.,data=d,subset=train,family="binomial")
+summary(res)
+```
+Make predictions
+```{r, echo=TRUE}
+pred <- predict(res,d[test,])
+(TAB <- table(d$y[test],pred>0))
+1- sum(diag(TAB))/sum(TAB)
+TAB[2,1]/sum(TAB[2,])
+```
+use weights for the observations
+```{r, echo=TRUE}
+w <- rep(NA,length(train))
+tt <- table(d$y[train])
+ww <- tt/sum(tt)
+w[d$y[train]=="yes"] <- ww[1]
+w[d$y[train]=="no"] <- ww[2]
+table(w)
+```
+Make predictions
+```{r, echo=TRUE,warning=FALSE}
+res1 <- glm(y~.,data=d[train,],family="binomial",weights=w)
+summary(res1)
+pred <- predict(res1,d[test,])
+(TAB <- table(d$y[test],pred>0))
+1- sum(diag(TAB))/sum(TAB)
+TAB[2,1]/sum(TAB[2,])
+```
+
+The results got better. The misclassification rate of the “yes” clients got much lower.
