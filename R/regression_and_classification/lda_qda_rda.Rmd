@@ -1,10 +1,3 @@
----
-title: "Exercise 7"
-subtitle: "for Advanced Methods for Regression and Classification"
-author: "Eszter Katalin Bognar"
-date: "11/25/2020"
-output: pdf_document
----
 
 To prevent cutting the pdf
 ```{r, echo = TRUE}
