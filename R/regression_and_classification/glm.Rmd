@@ -1,12 +1,4 @@
----
-title: "Exercise 8"
-subtitle: "for Advanced Methods for Regression and Classification"
-author: "Eszter Katalin Bognar"
-date: "12/02/2020"
-output: 
-  pdf_document: 
-    latex_engine: xelatex
----
+
 
 To prevent cutting the pdf
 ```{r, echo = TRUE}
