@@ -1,7 +1,4 @@
 
-# ML_EX3
-
-
 ## Notes: 
 
 The classical algorithms are trained and run on a MacBookPro 2018. 2,2 GHz Core i7 with 16GB Ram.  
